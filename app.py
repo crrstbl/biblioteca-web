@@ -27,12 +27,11 @@ def init_db():
         libro TEXT,
         tiempo_prestamo TEXT,
         fecha_prestamo TEXT,
-        verificado INTEGER DEFAULT 0,
-        token TEXT
+        token TEXT,
+        verificado INTEGER DEFAULT 0
     )''')
     conn.commit()
     conn.close()
-
 
 @app.route('/')
 def index():
