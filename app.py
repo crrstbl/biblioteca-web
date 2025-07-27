@@ -40,7 +40,7 @@ def index():
 @app.route('/registrar', methods=['POST'])
 def registrar():
     nombre = request.form['nombre']
-    edad = request.form['edad']
+    curso = request.form['curso']  # Ahora tomamos el curso
     correo = request.form['correo']
     libro = request.form['libro']
     tiempo = request.form['tiempo']
@@ -49,8 +49,8 @@ def registrar():
 
     conn = sqlite3.connect('biblioteca.db')
     c = conn.cursor()
-    c.execute("INSERT INTO registros (nombre, edad, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              (nombre, edad, correo, libro, tiempo, fecha, token))
+    c.execute("INSERT INTO registros (nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              (nombre, curso, correo, libro, tiempo, fecha, token))
     conn.commit()
     conn.close()
 
@@ -68,25 +68,18 @@ def registrar():
 def verificar(token):
     conn = sqlite3.connect('biblioteca.db')
     c = conn.cursor()
-    c.execute("UPDATE registros SET verificado = 1 WHERE token = ?", (token,))
-    conn.commit()
-    conn.close()
-    return "Tu préstamo fue verificado correctamente."
-
-@app.route('/verify/<token>')
-def verify(token):
-    conn = sqlite3.connect('biblioteca.db')
-    c = conn.cursor()
     c.execute("SELECT verificado FROM registros WHERE token = ?", (token,))
     fila = c.fetchone()
+
     if fila is None:
         mensaje = "Token inválido."
     elif fila[0] == 1:
-        mensaje = "Correo ya verificado."
+        mensaje = "El préstamo ya fue verificado anteriormente."
     else:
         c.execute("UPDATE registros SET verificado = 1 WHERE token = ?", (token,))
         conn.commit()
-        mensaje = "Correo verificado exitosamente. Ahora puedes pedir libros."
+        mensaje = "¡Préstamo verificado correctamente! Gracias por confirmar."
+
     conn.close()
     return mensaje
 
