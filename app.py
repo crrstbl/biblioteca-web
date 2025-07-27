@@ -22,7 +22,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS registros (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT,
-        edad INTEGER,
+        curso TEXT,
         correo TEXT,
         libro TEXT,
         tiempo_prestamo TEXT,
