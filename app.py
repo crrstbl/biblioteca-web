@@ -27,11 +27,12 @@ def init_db():
         libro TEXT,
         tiempo_prestamo TEXT,
         fecha_prestamo TEXT,
-        token TEXT,
-        verificado INTEGER DEFAULT 0
+        verificado INTEGER DEFAULT 0,
+        token TEXT
     )''')
     conn.commit()
     conn.close()
+
 
 @app.route('/')
 def index():
@@ -45,29 +46,33 @@ def registrar():
     libro = request.form['libro']
     tiempo = request.form['tiempo']
     fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    # Validar correo institucional
-    if not correo.endswith('@colegio.edu'):
-        return "El correo debe ser institucional (@colegio.edu)", 400
-
     token = secrets.token_urlsafe(16)
 
     conn = sqlite3.connect('biblioteca.db')
     c = conn.cursor()
-    c.execute("INSERT INTO registros (nombre, edad, correo, libro, tiempo_prestamo, fecha_prestamo, token, verificado) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+    c.execute("INSERT INTO registros (nombre, edad, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (?, ?, ?, ?, ?, ?, ?)",
               (nombre, edad, correo, libro, tiempo, fecha, token))
     conn.commit()
     conn.close()
 
-    # Enviar correo de verificación
-    verify_url = url_for('verify', token=token, _external=True)
-    msg = Message(subject="Verifica tu correo - Biblioteca",
-                  sender=app.config['MAIL_USERNAME'],
+    # Enviar email de verificación
+    msg = Message('Verifica tu préstamo de libro',
+                  sender='tucorreo@gmail.com',
                   recipients=[correo])
-    msg.body = f"Hola {nombre},\n\nGracias por registrarte. Para confirmar tu correo, haz clic en el siguiente enlace:\n\n{verify_url}\n\nSi no hiciste este registro, ignora este mensaje."
+    link = f"http://localhost:5000/verificar/{token}"
+    msg.body = f"Hola {nombre}, haz clic aquí para verificar tu préstamo: {link}"
     mail.send(msg)
 
-    return "Registro recibido. Por favor, revisa tu correo institucional para confirmar."
+    return "Te enviamos un correo para verificar tu préstamo."
+
+@app.route('/verificar/<token>')
+def verificar(token):
+    conn = sqlite3.connect('biblioteca.db')
+    c = conn.cursor()
+    c.execute("UPDATE registros SET verificado = 1 WHERE token = ?", (token,))
+    conn.commit()
+    conn.close()
+    return "Tu préstamo fue verificado correctamente."
 
 @app.route('/verify/<token>')
 def verify(token):
