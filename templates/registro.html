@@ -48,12 +48,13 @@
         <input type="email" class="form-control" name="correo" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">Libro que desea pedir por 14 dias</label>
-        <select class="form-select" name="libro">
-          <option>El Principito</option>
-          <option>Harry Potter</option>
-          <option>Cuentos de Andersen</option>
-          <option>Alicia en el País de las Maravillas</option>
+        <label class="form-label">Libro que desea pedir (préstamo por 14 días)</label>
+        <select class="form-select" name="libro" required>
+          {% for libro in libros %}
+            <option>{{ libro }}</option>
+          {% else %}
+            <option disabled>No hay libros disponibles</option>
+          {% endfor %}
         </select>
       </div>
       <button type="submit" class="btn btn-success">Registrar Préstamo</button>

@@ -1,21 +1,105 @@
+/* Fondo suave y tipografía legible */
 body {
-  background: #f4f8fb;
-  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #a0d8f7, #5b9bd5);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #1c2833;
+  margin: 0;
+  padding: 20px 0;
 }
 
+/* Contenedor centrado y con sombra */
+.container {
+  max-width: 700px;
+  background: #ffffffdd;
+  border-radius: 15px;
+  padding: 30px 40px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  margin: 40px auto;
+}
+
+/* Título llamativo */
 h2 {
   color: #2c3e50;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 30px;
+  text-shadow: 1px 1px 3px #7aa7d9;
 }
 
+/* Tabla blanca con bordes redondeados */
 .table {
   background-color: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
 }
 
+/* Encabezado azul con texto blanco */
 .table th {
   background-color: #3498db;
   color: white;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px 15px;
 }
 
-.container {
-  max-width: 700px;
+/* Celdas con padding y separación */
+.table td {
+  padding: 12px 15px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Última fila sin borde */
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Formularios con bordes redondeados */
+input.form-control, select.form-select {
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  padding: 10px 15px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Foco en inputs */
+input.form-control:focus, select.form-select:focus {
+  border-color: #2980b9;
+  box-shadow: 0 0 8px #2980b9aa;
+  outline: none;
+}
+
+/* Botones grandes y amigables */
+button {
+  background-color: #3498db;
+  border: none;
+  padding: 14px 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  border-radius: 12px;
+  color: white;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  box-shadow: 0 4px 12px #2980b9aa;
+  margin-top: 10px;
+}
+
+/* Hover botones */
+button:hover {
+  background-color: #2980b9;
+  box-shadow: 0 6px 18px #1c5985cc;
+}
+
+/* Mensajes de verificado */
+.verificado {
+  color: #27ae60;
+  font-size: 1.4rem;
+}
+
+.no-verificado {
+  color: #e74c3c;
+  font-size: 1.4rem;
 }

@@ -10,12 +10,12 @@ app = Flask(__name__)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'bibliotecatomaslago@gmail.com'       # Cambia aquí
-app.config['MAIL_PASSWORD'] = 'dehursreirrhrhap'             # Cambia aquí
+app.config['MAIL_USERNAME'] = 'bibliotecatomaslago@gmail.com'  # Cambia aquí
+app.config['MAIL_PASSWORD'] = 'dehursreirrhrhap'               # Cambia aquí
 
 mail = Mail(app)
 
-# Crear la base de datos con campos para verificación
+# Crear la base de datos con campos para verificación y libros
 def init_db():
     conn = sqlite3.connect('biblioteca.db')
     c = conn.cursor()
@@ -30,20 +30,29 @@ def init_db():
         token TEXT,
         verificado INTEGER DEFAULT 0
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS libros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT UNIQUE NOT NULL
+    )''')
     conn.commit()
     conn.close()
 
 @app.route('/')
 def index():
-    return render_template('registro.html')
+    conn = sqlite3.connect('biblioteca.db')
+    c = conn.cursor()
+    c.execute("SELECT titulo FROM libros ORDER BY titulo")
+    libros = [libro[0] for libro in c.fetchall()]
+    conn.close()
+    return render_template('registro.html', libros=libros)
 
 @app.route('/registrar', methods=['POST'])
 def registrar():
     nombre = request.form['nombre']
-    curso = request.form['curso']  # Ahora tomamos el curso
+    curso = request.form['curso']
     correo = request.form['correo']
     libro = request.form['libro']
-    tiempo = request.form['tiempo']
+    tiempo = 14  # Siempre 14 días
     fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     token = secrets.token_urlsafe(16)
 
@@ -56,7 +65,7 @@ def registrar():
 
     # Enviar email de verificación
     msg = Message('Verifica tu préstamo de libro',
-                  sender='tucorreo@gmail.com',
+                  sender='bibliotecatomaslago@gmail.com',  # Pon aquí tu correo
                   recipients=[correo])
     link = f"https://biblioteca-web-mgmi.onrender.com/verificar/{token}"
     msg.body = f"Hola {nombre}, haz clic aquí para verificar tu préstamo: {link}"
@@ -91,6 +100,24 @@ def admin():
     datos = c.fetchall()
     conn.close()
     return render_template('admin.html', registros=datos)
+
+@app.route('/admin/libros', methods=['GET', 'POST'])
+def admin_libros():
+    conn = sqlite3.connect('biblioteca.db')
+    c = conn.cursor()
+    mensaje = ""
+    if request.method == 'POST':
+        nuevo_libro = request.form['nuevo_libro']
+        try:
+            c.execute("INSERT INTO libros (titulo) VALUES (?)", (nuevo_libro,))
+            conn.commit()
+            mensaje = "Libro agregado correctamente."
+        except sqlite3.IntegrityError:
+            mensaje = "El libro ya existe."
+    c.execute("SELECT titulo FROM libros ORDER BY titulo")
+    libros = c.fetchall()
+    conn.close()
+    return render_template('admin_libros.html', libros=libros, mensaje=mensaje)
 
 if __name__ == '__main__':
     from os import environ
