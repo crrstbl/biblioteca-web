@@ -26,7 +26,7 @@ def get_connection():
         port=5432
     )
 
-# Inicializar DB
+
 def init_db():
     conn = get_connection()
     c = conn.cursor()
