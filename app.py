@@ -1,45 +1,60 @@
 from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
 from datetime import datetime
 from flask_mail import Mail, Message
 import secrets
+import psycopg2
+import os
 
 app = Flask(__name__)
 
-# Configuración Flask-Mail (ajusta con tus datos)
+# Configuración de Flask-Mail
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'bibliotecatomaslago@gmail.com'  # Cambia aquí
-app.config['MAIL_PASSWORD'] = 'dehursreirrhrhap'               # Cambia aquí
+app.config['MAIL_USERNAME'] = 'bibliotecatomaslago@gmail.com'
+app.config['MAIL_PASSWORD'] = 'dehursreirrhrhap'
 
 mail = Mail(app)
 
-# Crear la base de datos con campos para verificación y libros
+# Función de conexión a PostgreSQL
+def get_connection():
+    return psycopg2.connect(
+        host=os.environ.get("DB_HOST"),
+        database=os.environ.get("DB_NAME"),
+        user=os.environ.get("DB_USER"),
+        password=os.environ.get("DB_PASSWORD"),
+        port=5432
+    )
+
+# Inicializar DB
 def init_db():
-    conn = sqlite3.connect('biblioteca.db')
+    conn = get_connection()
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS registros (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT,
-        curso TEXT,
-        correo TEXT,
-        libro TEXT,
-        tiempo_prestamo TEXT,
-        fecha_prestamo TEXT,
-        token TEXT,
-        verificado INTEGER DEFAULT 0
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS libros (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        titulo TEXT UNIQUE NOT NULL
-    )''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS registros (
+            id SERIAL PRIMARY KEY,
+            nombre TEXT,
+            curso TEXT,
+            correo TEXT,
+            libro TEXT,
+            tiempo_prestamo TEXT,
+            fecha_prestamo TEXT,
+            token TEXT,
+            verificado INTEGER DEFAULT 0
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS libros (
+            id SERIAL PRIMARY KEY,
+            titulo TEXT UNIQUE NOT NULL
+        )
+    ''')
     conn.commit()
     conn.close()
 
 @app.route('/')
 def index():
-    conn = sqlite3.connect('biblioteca.db')
+    conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT titulo FROM libros ORDER BY titulo")
     libros = [libro[0] for libro in c.fetchall()]
@@ -52,20 +67,19 @@ def registrar():
     curso = request.form['curso']
     correo = request.form['correo']
     libro = request.form['libro']
-    tiempo = 14  # Siempre 14 días
+    tiempo = 14
     fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     token = secrets.token_urlsafe(16)
 
-    conn = sqlite3.connect('biblioteca.db')
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO registros (nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO registros (nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (%s, %s, %s, %s, %s, %s, %s)",
               (nombre, curso, correo, libro, tiempo, fecha, token))
     conn.commit()
     conn.close()
 
-    # Enviar email de verificación
     msg = Message('Verifica tu préstamo de libro',
-                  sender='bibliotecatomaslago@gmail.com',  # Pon aquí tu correo
+                  sender='bibliotecatomaslago@gmail.com',
                   recipients=[correo])
     link = f"https://biblioteca-web-mgmi.onrender.com/verificar/{token}"
     msg.body = f"Hola {nombre}, haz clic aquí para verificar tu préstamo: {link}"
@@ -75,9 +89,9 @@ def registrar():
 
 @app.route('/verificar/<token>')
 def verificar(token):
-    conn = sqlite3.connect('biblioteca.db')
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT verificado FROM registros WHERE token = ?", (token,))
+    c.execute("SELECT verificado FROM registros WHERE token = %s", (token,))
     fila = c.fetchone()
 
     if fila is None:
@@ -85,7 +99,7 @@ def verificar(token):
     elif fila[0] == 1:
         mensaje = "El préstamo ya fue verificado anteriormente."
     else:
-        c.execute("UPDATE registros SET verificado = 1 WHERE token = ?", (token,))
+        c.execute("UPDATE registros SET verificado = 1 WHERE token = %s", (token,))
         conn.commit()
         mensaje = "¡Préstamo verificado correctamente! Gracias por confirmar."
 
@@ -94,7 +108,7 @@ def verificar(token):
 
 @app.route('/admin')
 def admin():
-    conn = sqlite3.connect('biblioteca.db')
+    conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, verificado FROM registros")
     datos = c.fetchall()
@@ -103,36 +117,37 @@ def admin():
 
 @app.route('/admin/libros', methods=['GET', 'POST'])
 def admin_libros():
-    conn = sqlite3.connect('biblioteca.db')
+    conn = get_connection()
     c = conn.cursor()
     mensaje = ""
 
-    # Si el usuario está eliminando un libro
     if request.method == 'POST':
         if 'eliminar_id' in request.form:
             libro_id = request.form['eliminar_id']
-            c.execute("DELETE FROM libros WHERE id = ?", (libro_id,))
+            c.execute("DELETE FROM libros WHERE id = %s", (libro_id,))
             conn.commit()
             mensaje = "Libro eliminado correctamente."
         elif 'nuevo_libro' in request.form:
             nuevo_libro = request.form['nuevo_libro']
             try:
-                c.execute("INSERT INTO libros (titulo) VALUES (?)", (nuevo_libro,))
+                c.execute("INSERT INTO libros (titulo) VALUES (%s)", (nuevo_libro,))
                 conn.commit()
                 mensaje = "Libro agregado correctamente."
-            except sqlite3.IntegrityError:
+            except psycopg2.IntegrityError:
+                conn.rollback()
                 mensaje = "El libro ya existe."
 
-    # Buscar libros si se ingresó un término
     termino_busqueda = request.args.get('buscar', '')
     if termino_busqueda:
-        c.execute("SELECT id, titulo FROM libros WHERE titulo LIKE ? ORDER BY titulo", ('%' + termino_busqueda + '%',))
+        c.execute("SELECT id, titulo FROM libros WHERE titulo ILIKE %s ORDER BY titulo", ('%' + termino_busqueda + '%',))
     else:
         c.execute("SELECT id, titulo FROM libros ORDER BY titulo")
 
     libros = c.fetchall()
     conn.close()
     return render_template('admin_libros.html', libros=libros, mensaje=mensaje, buscar=termino_busqueda)
+
 if __name__ == '__main__':
+    init_db()
     from os import environ
     app.run(host='0.0.0.0', port=int(environ.get("PORT", 5000)), debug=True)
