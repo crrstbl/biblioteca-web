@@ -11,7 +11,7 @@
     <h2 class="text-center mb-4">Registro de Préstamo de Libros</h2>
     <form method="POST" action="/registrar">
       <div class="mb-3">
-        <label class="form-label">Nombre del niño</label>
+        <label class="form-label">Nombre</label>
         <input type="text" class="form-control" name="nombre" required>
       </div>
       <div class="mb-3">
@@ -48,17 +48,13 @@
         <input type="email" class="form-control" name="correo" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">Libro que desea pedir</label>
+        <label class="form-label">Libro que desea pedir por 14 dias</label>
         <select class="form-select" name="libro">
           <option>El Principito</option>
           <option>Harry Potter</option>
           <option>Cuentos de Andersen</option>
           <option>Alicia en el País de las Maravillas</option>
         </select>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">¿Por cuánto tiempo (días)?</label>
-        <input type="number" class="form-control" name="tiempo" required>
       </div>
       <button type="submit" class="btn btn-success">Registrar Préstamo</button>
     </form>
