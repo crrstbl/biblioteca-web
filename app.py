@@ -106,19 +106,33 @@ def admin_libros():
     conn = sqlite3.connect('biblioteca.db')
     c = conn.cursor()
     mensaje = ""
+
+    # Si el usuario está eliminando un libro
     if request.method == 'POST':
-        nuevo_libro = request.form['nuevo_libro']
-        try:
-            c.execute("INSERT INTO libros (titulo) VALUES (?)", (nuevo_libro,))
+        if 'eliminar_id' in request.form:
+            libro_id = request.form['eliminar_id']
+            c.execute("DELETE FROM libros WHERE id = ?", (libro_id,))
             conn.commit()
-            mensaje = "Libro agregado correctamente."
-        except sqlite3.IntegrityError:
-            mensaje = "El libro ya existe."
-    c.execute("SELECT titulo FROM libros ORDER BY titulo")
+            mensaje = "Libro eliminado correctamente."
+        elif 'nuevo_libro' in request.form:
+            nuevo_libro = request.form['nuevo_libro']
+            try:
+                c.execute("INSERT INTO libros (titulo) VALUES (?)", (nuevo_libro,))
+                conn.commit()
+                mensaje = "Libro agregado correctamente."
+            except sqlite3.IntegrityError:
+                mensaje = "El libro ya existe."
+
+    # Buscar libros si se ingresó un término
+    termino_busqueda = request.args.get('buscar', '')
+    if termino_busqueda:
+        c.execute("SELECT id, titulo FROM libros WHERE titulo LIKE ? ORDER BY titulo", ('%' + termino_busqueda + '%',))
+    else:
+        c.execute("SELECT id, titulo FROM libros ORDER BY titulo")
+
     libros = c.fetchall()
     conn.close()
-    return render_template('admin_libros.html', libros=libros, mensaje=mensaje)
-
+    return render_template('admin_libros.html', libros=libros, mensaje=mensaje, buscar=termino_busqueda)
 if __name__ == '__main__':
     from os import environ
     app.run(host='0.0.0.0', port=int(environ.get("PORT", 5000)), debug=True)
