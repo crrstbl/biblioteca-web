@@ -9,12 +9,8 @@ body {
 
 /* Contenedor centrado y con sombra */
 .container {
-  max-width: 700px;
-  background: #ffffffdd;
-  border-radius: 15px;
-  padding: 30px 40px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  margin: 40px auto;
+  max-width: 1000px;  /* Aumenta el ancho */
+  margin: auto;
 }
 
 /* Título llamativo */
