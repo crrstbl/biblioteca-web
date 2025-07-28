@@ -58,7 +58,7 @@ def registrar():
     msg = Message('Verifica tu préstamo de libro',
                   sender='tucorreo@gmail.com',
                   recipients=[correo])
-    link = f"http://localhost:5000/verificar/{token}"
+    link = f"https://biblioteca-web-mgmi.onrender.com/verificar/{token}"
     msg.body = f"Hola {nombre}, haz clic aquí para verificar tu préstamo: {link}"
     mail.send(msg)
 
