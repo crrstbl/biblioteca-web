@@ -87,7 +87,7 @@ def verificar(token):
 def admin():
     conn = sqlite3.connect('biblioteca.db')
     c = conn.cursor()
-    c.execute("SELECT nombre, edad, correo, libro, tiempo_prestamo, fecha_prestamo, verificado FROM registros")
+    c.execute("SELECT nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, verificado FROM registros")
     datos = c.fetchall()
     conn.close()
     return render_template('admin.html', registros=datos)
