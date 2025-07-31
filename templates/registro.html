@@ -49,6 +49,8 @@
             {% if libro.stock > 0 %}
               <option value="{{ libro.nombre }}">{{ libro.nombre }} (Stock: {{ libro.stock }})</option>
               {% set disponibles = disponibles + 1 %}
+            {% else %}
+              <option value="{{ libro.nombre }}" disabled>{{ libro.nombre }} (Stock: 0)</option>
             {% endif %}
           {% endfor %}
           {% if disponibles == 0 %}

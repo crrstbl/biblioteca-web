@@ -24,28 +24,37 @@
           <th>Tiempo (días)</th>
           <th>Fecha Préstamo</th>
           <th>Verificado</th>
+          <th>Eliminar</th>  <!-- Nueva columna -->
         </tr>
       </thead>
       <tbody>
         {% for r in registros %}
-        <tr>
-          <td>{{ r[0] }}</td>
+        {% set fecha_dt = r[5] | todatetime %}
+        {% set dias_prestamo = (now - fecha_dt).days %}
+        <tr {% if dias_prestamo > 14 %} class="table-danger" {% endif %}>
           <td>{{ r[1] }}</td>
           <td>{{ r[2] }}</td>
           <td>{{ r[3] }}</td>
           <td>{{ r[4] }}</td>
           <td>{{ r[5] }}</td>
+          <td>{{ r[6] }}</td>
           <td class="text-center">
-            {% if r[6] == 1 %}
+            {% if r[7] == 1 %}
               ✅
             {% else %}
               ❌
             {% endif %}
           </td>
+          <td>
+            <form method="POST" action="/admin/eliminar_registro" onsubmit="return confirm('¿Eliminar este registro?');">
+              <input type="hidden" name="registro_id" value="{{ r[0] }}">
+              <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+            </form>
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="text-center">No hay registros aún</td>
+          <td colspan="8" class="text-center">No hay registros aún</td>
         </tr>
         {% endfor %}
       </tbody>

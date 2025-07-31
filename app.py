@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for
-from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash
+from datetime import datetime, timedelta
 from flask_mail import Mail, Message
 import secrets
 import psycopg2
@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = 'tu_clave_secreta_aqui'
 
 # Configuración de Flask-Mail
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -18,7 +19,6 @@ app.config['MAIL_PASSWORD'] = 'dehursreirrhrhap'
 
 mail = Mail(app)
 
-# Función de conexión a PostgreSQL
 def get_connection():
     return psycopg2.connect(
         host=os.environ.get("DB_HOST"),
@@ -38,8 +38,8 @@ def init_db():
             curso TEXT,
             correo TEXT,
             libro TEXT,
-            tiempo_prestamo TEXT,
-            fecha_prestamo TEXT,
+            tiempo_prestamo INTEGER,
+            fecha_prestamo TIMESTAMP,
             token TEXT,
             verificado INTEGER DEFAULT 0
         )
@@ -54,19 +54,24 @@ def init_db():
     conn.commit()
     conn.close()
 
+@app.template_filter('todatetime')
+def todatetime_filter(value):
+    # Si el valor es datetime ya, retorna directamente
+    if isinstance(value, datetime):
+        return value
+    # Si es string, intenta parsear
+    return datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+
 @app.route('/')
 def index():
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT titulo, stock FROM libros ORDER BY titulo")
-    libros_raw = c.fetchall()  # Lista de tuplas (titulo, stock)
+    libros_raw = c.fetchall()
     conn.close()
 
-    # Convertimos a lista de diccionarios para que Jinja pueda acceder con .nombre y .stock
     libros = [{"nombre": libro[0], "stock": libro[1]} for libro in libros_raw]
-
     return render_template('registro.html', libros=libros)
-
 
 @app.route('/registrar', methods=['POST'])
 def registrar():
@@ -75,13 +80,15 @@ def registrar():
     correo = request.form['correo']
     libro = request.form['libro']
     tiempo = 14
-    fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    fecha = datetime.now()
     token = secrets.token_urlsafe(16)
 
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO registros (nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-              (nombre, curso, correo, libro, tiempo, fecha, token))
+    c.execute(
+        "INSERT INTO registros (nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, token) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (nombre, curso, correo, libro, tiempo, fecha, token)
+    )
     conn.commit()
     conn.close()
 
@@ -107,7 +114,6 @@ def verificar(token):
         mensaje = "El préstamo ya fue verificado anteriormente."
     else:
         libro = fila[1]
-        # Verificamos si hay stock
         c.execute("SELECT stock FROM libros WHERE titulo = %s", (libro,))
         resultado = c.fetchone()
         if resultado is None:
@@ -115,7 +121,6 @@ def verificar(token):
         elif resultado[0] <= 0:
             mensaje = "No hay stock disponible para este libro."
         else:
-            # Actualiza verificado y resta stock
             c.execute("UPDATE registros SET verificado = 1 WHERE token = %s", (token,))
             c.execute("UPDATE libros SET stock = stock - 1 WHERE titulo = %s", (libro,))
             conn.commit()
@@ -124,15 +129,50 @@ def verificar(token):
     conn.close()
     return mensaje
 
-
 @app.route('/admin')
 def admin():
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, verificado FROM registros")
+    c.execute("SELECT id, nombre, curso, correo, libro, tiempo_prestamo, fecha_prestamo, verificado FROM registros ORDER BY fecha_prestamo DESC")
     datos = c.fetchall()
     conn.close()
-    return render_template('admin.html', registros=datos)
+
+    now = datetime.now()
+    # Pasamos now para cálculo en plantilla
+    return render_template('admin.html', registros=datos, now=now)
+
+@app.route('/admin/eliminar_registro', methods=['POST'])
+def eliminar_registro():
+    registro_id = request.form.get('registro_id')
+    if not registro_id:
+        flash("ID de registro no proporcionado.", "danger")
+        return redirect(url_for('admin'))
+
+    conn = get_connection()
+    c = conn.cursor()
+
+    # Primero recuperamos el libro para reponer stock si estaba verificado
+    c.execute("SELECT libro, verificado FROM registros WHERE id = %s", (registro_id,))
+    fila = c.fetchone()
+    if not fila:
+        flash("Registro no encontrado.", "danger")
+        conn.close()
+        return redirect(url_for('admin'))
+
+    libro, verificado = fila
+
+    # Si estaba verificado, aumentamos stock
+    if verificado == 1:
+        c.execute("UPDATE libros SET stock = stock + 1 WHERE titulo = %s", (libro,))
+
+    # Borramos el registro
+    c.execute("DELETE FROM registros WHERE id = %s", (registro_id,))
+    conn.commit()
+    conn.close()
+
+    flash("Registro eliminado y stock actualizado si correspondía.", "success")
+    return redirect(url_for('admin'))
+
 
 @app.route('/admin/libros', methods=['GET', 'POST'])
 def admin_libros():
@@ -174,6 +214,44 @@ def admin_libros():
     libros = c.fetchall()
     conn.close()
     return render_template('admin_libros.html', libros=libros, mensaje=mensaje, buscar=termino_busqueda)
+
+
+# Función para enviar correos a usuarios con 1 día restante
+def enviar_recordatorios_1_dia():
+    conn = get_connection()
+    c = conn.cursor()
+    ahora = datetime.now()
+    un_dia = timedelta(days=1)
+
+    # Seleccionar registros verificados donde faltan 1 día para vencer (tiempo_prestamo=14 días)
+    c.execute("""
+        SELECT nombre, correo, libro, fecha_prestamo
+        FROM registros
+        WHERE verificado = 1
+    """)
+    registros = c.fetchall()
+
+    for nombre, correo, libro, fecha_prestamo in registros:
+        fecha_prestamo_dt = fecha_prestamo if isinstance(fecha_prestamo, datetime) else datetime.strptime(fecha_prestamo, '%Y-%m-%d %H:%M:%S')
+        fecha_vencimiento = fecha_prestamo_dt + timedelta(days=14)
+        dias_restantes = (fecha_vencimiento - ahora).days
+
+        if dias_restantes == 1:
+            # Enviar correo recordatorio
+            msg = Message('Recordatorio: Entrega tu libro',
+                          sender='bibliotecatomaslago@gmail.com',
+                          recipients=[correo])
+            msg.body = (f"Hola {nombre},\n\n"
+                        f"Te recordamos que debes entregar el libro '{libro}' dentro de 1 día.\n"
+                        "Por favor, hazlo a tiempo para que otros puedan disfrutarlo.\n\n"
+                        "Gracias.")
+            mail.send(msg)
+
+    conn.close()
+
+# Para llamar esta función puedes usar un scheduler externo (cron, celery, etc.)
+# Por ejemplo, la puedes llamar al iniciar app para pruebas (¡solo una vez!):
+# enviar_recordatorios_1_dia()
 
 if __name__ == '__main__':
     init_db()
