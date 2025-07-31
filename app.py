@@ -47,34 +47,24 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS libros (
             id SERIAL PRIMARY KEY,
-            titulo TEXT UNIQUE NOT NULL
+            titulo TEXT UNIQUE NOT NULL,
+            stock INTEGER DEFAULT 1
         )
     ''')
     conn.commit()
     conn.close()
 
-# ✅ NUEVA FUNCIÓN PARA AGREGAR COLUMNA STOCK
-def actualizar_tabla_libros():
-    conn = get_connection()
-    c = conn.cursor()
-    try:
-        c.execute("ALTER TABLE libros ADD COLUMN stock INTEGER DEFAULT 1;")
-        conn.commit()
-        print("Columna 'stock' añadida correctamente.")
-    except psycopg2.errors.DuplicateColumn:
-        print("La columna 'stock' ya existe.")
-        conn.rollback()
-    conn.close()
-
-@app.route('/')
 @app.route('/')
 def index():
     conn = get_connection()
     c = conn.cursor()
-    # Traemos título y stock
     c.execute("SELECT titulo, stock FROM libros ORDER BY titulo")
-    libros = c.fetchall()  # lista de tuplas (titulo, stock)
+    libros_raw = c.fetchall()  # Lista de tuplas (titulo, stock)
     conn.close()
+
+    # Convertimos a lista de diccionarios para que Jinja pueda acceder con .nombre y .stock
+    libros = [{"nombre": libro[0], "stock": libro[1]} for libro in libros_raw]
+
     return render_template('registro.html', libros=libros)
 
 
@@ -167,7 +157,6 @@ def admin_libros():
             except psycopg2.IntegrityError:
                 conn.rollback()
                 mensaje = "El libro ya existe."
-
 
         elif 'actualizar_stock_id' in request.form:
             libro_id = request.form['actualizar_stock_id']
