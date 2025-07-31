@@ -70,8 +70,8 @@ def actualizar_tabla_libros():
 def index():
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT titulo FROM libros ORDER BY titulo")
-    libros = [libro[0] for libro in c.fetchall()]
+    c.execute("SELECT titulo, stock FROM libros ORDER BY titulo")
+    libros = [{"titulo": row[0], "stock": row[1]} for row in c.fetchall()]
     conn.close()
     return render_template('registro.html', libros=libros)
 
@@ -105,7 +105,7 @@ def registrar():
 def verificar(token):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT verificado FROM registros WHERE token = %s", (token,))
+    c.execute("SELECT verificado, libro FROM registros WHERE token = %s", (token,))
     fila = c.fetchone()
 
     if fila is None:
@@ -113,12 +113,24 @@ def verificar(token):
     elif fila[0] == 1:
         mensaje = "El préstamo ya fue verificado anteriormente."
     else:
-        c.execute("UPDATE registros SET verificado = 1 WHERE token = %s", (token,))
-        conn.commit()
-        mensaje = "¡Préstamo verificado correctamente! Gracias por confirmar."
+        libro = fila[1]
+        # Verificamos si hay stock
+        c.execute("SELECT stock FROM libros WHERE titulo = %s", (libro,))
+        resultado = c.fetchone()
+        if resultado is None:
+            mensaje = "El libro no existe."
+        elif resultado[0] <= 0:
+            mensaje = "No hay stock disponible para este libro."
+        else:
+            # Actualiza verificado y resta stock
+            c.execute("UPDATE registros SET verificado = 1 WHERE token = %s", (token,))
+            c.execute("UPDATE libros SET stock = stock - 1 WHERE titulo = %s", (libro,))
+            conn.commit()
+            mensaje = "¡Préstamo verificado correctamente! El stock ha sido actualizado."
 
     conn.close()
     return mensaje
+
 
 @app.route('/admin')
 def admin():
@@ -141,21 +153,29 @@ def admin_libros():
             c.execute("DELETE FROM libros WHERE id = %s", (libro_id,))
             conn.commit()
             mensaje = "Libro eliminado correctamente."
+
         elif 'nuevo_libro' in request.form:
             nuevo_libro = request.form['nuevo_libro']
             try:
-                c.execute("INSERT INTO libros (titulo) VALUES (%s)", (nuevo_libro,))
+                c.execute("INSERT INTO libros (titulo, stock) VALUES (%s, %s)", (nuevo_libro, 1))
                 conn.commit()
-                mensaje = "Libro agregado correctamente."
+                mensaje = "Libro agregado correctamente con stock inicial de 1."
             except psycopg2.IntegrityError:
                 conn.rollback()
                 mensaje = "El libro ya existe."
 
+        elif 'actualizar_stock_id' in request.form:
+            libro_id = request.form['actualizar_stock_id']
+            nuevo_stock = int(request.form['nuevo_stock'])
+            c.execute("UPDATE libros SET stock = %s WHERE id = %s", (nuevo_stock, libro_id))
+            conn.commit()
+            mensaje = "Stock actualizado correctamente."
+
     termino_busqueda = request.args.get('buscar', '')
     if termino_busqueda:
-        c.execute("SELECT id, titulo FROM libros WHERE titulo ILIKE %s ORDER BY titulo", ('%' + termino_busqueda + '%',))
+        c.execute("SELECT id, titulo, stock FROM libros WHERE titulo ILIKE %s ORDER BY titulo", ('%' + termino_busqueda + '%',))
     else:
-        c.execute("SELECT id, titulo FROM libros ORDER BY titulo")
+        c.execute("SELECT id, titulo, stock FROM libros ORDER BY titulo")
 
     libros = c.fetchall()
     conn.close()
