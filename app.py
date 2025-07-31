@@ -56,11 +56,11 @@ def init_db():
 
 @app.template_filter('todatetime')
 def todatetime_filter(value):
-    # Si el valor es datetime ya, retorna directamente
-    if isinstance(value, datetime):
-        return value
-    # Si es string, intenta parsear
-    return datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+    try:
+        return datetime.strptime(value, '%Y-%m-%d %H:%M:%S.%f')
+    except ValueError:
+        return datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+
 
 @app.route('/')
 def index():
