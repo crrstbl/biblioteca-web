@@ -67,13 +67,16 @@ def actualizar_tabla_libros():
     conn.close()
 
 @app.route('/')
+@app.route('/')
 def index():
     conn = get_connection()
     c = conn.cursor()
+    # Traemos título y stock
     c.execute("SELECT titulo, stock FROM libros ORDER BY titulo")
-    libros = [{"titulo": row[0], "stock": row[1]} for row in c.fetchall()]
+    libros = c.fetchall()  # lista de tuplas (titulo, stock)
     conn.close()
     return render_template('registro.html', libros=libros)
+
 
 @app.route('/registrar', methods=['POST'])
 def registrar():
@@ -154,15 +157,17 @@ def admin_libros():
             conn.commit()
             mensaje = "Libro eliminado correctamente."
 
-        elif 'nuevo_libro' in request.form:
+        elif 'nuevo_libro' in request.form and 'stock_libro' in request.form:
             nuevo_libro = request.form['nuevo_libro']
+            stock_libro = request.form['stock_libro']
             try:
-                c.execute("INSERT INTO libros (titulo, stock) VALUES (%s, %s)", (nuevo_libro, 1))
+                c.execute("INSERT INTO libros (titulo, stock) VALUES (%s, %s)", (nuevo_libro, stock_libro))
                 conn.commit()
-                mensaje = "Libro agregado correctamente con stock inicial de 1."
+                mensaje = "Libro agregado correctamente."
             except psycopg2.IntegrityError:
                 conn.rollback()
                 mensaje = "El libro ya existe."
+
 
         elif 'actualizar_stock_id' in request.form:
             libro_id = request.form['actualizar_stock_id']
