@@ -4,6 +4,8 @@ from flask_mail import Mail, Message
 import secrets
 import psycopg2
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -25,7 +27,6 @@ def get_connection():
         password=os.environ.get("DB_PASSWORD"),
         port=5432
     )
-
 
 def init_db():
     conn = get_connection()
@@ -50,6 +51,19 @@ def init_db():
         )
     ''')
     conn.commit()
+    conn.close()
+
+# ✅ NUEVA FUNCIÓN PARA AGREGAR COLUMNA STOCK
+def actualizar_tabla_libros():
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute("ALTER TABLE libros ADD COLUMN stock INTEGER DEFAULT 1;")
+        conn.commit()
+        print("Columna 'stock' añadida correctamente.")
+    except psycopg2.errors.DuplicateColumn:
+        print("La columna 'stock' ya existe.")
+        conn.rollback()
     conn.close()
 
 @app.route('/')
