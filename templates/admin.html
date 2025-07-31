@@ -29,7 +29,7 @@
       </thead>
       <tbody>
         {% for r in registros %}
-        {% set fecha_dt = r[5] | todatetime %}
+        {% set fecha_dt = r[6] | todatetime %}
         {% set dias_prestamo = (now - fecha_dt).days %}
         <tr {% if dias_prestamo > 14 %} class="table-danger" {% endif %}>
           <td>{{ r[1] }}</td>
